@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=Comic+Neue:wght@300;400;700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Baloo 2", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Baloo 2", ui-sans-serif, system-ui, sans-serif;
+  --font-comic: "Comic Neue", cursive;
+  
+  --shadow-clay: 8px 8px 16px 0 rgba(0, 0, 0, 0.1), inset -4px -4px 8px 0 rgba(0, 0, 0, 0.05), inset 4px 4px 8px 0 rgba(255, 255, 255, 0.8);
+  --shadow-clay-dark: 8px 8px 16px 0 rgba(0, 0, 0, 0.4), inset -4px -4px 8px 0 rgba(255, 255, 255, 0.05), inset 4px 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+
+@utility shadow-clay {
+  shadow: var(--shadow-clay);
+}
+
+@utility shadow-clay-dark {
+  shadow: var(--shadow-clay-dark);
+}

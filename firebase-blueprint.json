@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "test_result": {
+      "title": "Test Result",
+      "description": "A record of a student's test completion",
+      "type": "object",
+      "properties": {
+        "studentName": {
+          "type": "string",
+          "description": "The name of the student"
+        },
+        "systemId": {
+          "type": "string",
+          "description": "The ID of the human body system"
+        },
+        "systemTitle": {
+          "type": "string",
+          "description": "The title of the human body system"
+        },
+        "score": {
+          "type": "integer",
+          "description": "The number of correct answers"
+        },
+        "totalQuestions": {
+          "type": "integer",
+          "description": "The total number of questions in the test"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the test was completed"
+        }
+      },
+      "required": ["studentName", "systemId", "score", "totalQuestions", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/test_results/{resultId}": {
+      "schema": "test_result",
+      "description": "Collection of all test results"
+    }
+  }
+}

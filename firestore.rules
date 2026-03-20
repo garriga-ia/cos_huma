@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: test_results
+    // Fields:
+    //   - studentName: string (required, 1-100 chars)
+    //   - systemId: string (required)
+    //   - systemTitle: string (required)
+    //   - score: int (required, >= 0)
+    //   - totalQuestions: int (required, > 0)
+    //   - timestamp: timestamp (required)
+    //   - userId: string (optional, for logged in users)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
+         (request.auth.token.email == "albert.garriga.ia@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidTestResult(data) {
+      return data.keys().hasAll(['studentName', 'systemId', 'systemTitle', 'score', 'totalQuestions', 'timestamp']) &&
+             data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 100 &&
+             data.systemId is string &&
+             data.systemTitle is string &&
+             data.score is int && data.score >= 0 &&
+             data.totalQuestions is int && data.totalQuestions > 0 &&
+             data.timestamp is timestamp &&
+             (!('userId' in data) || data.userId == null || data.userId is string);
+    }
+
+    match /test_results/{resultId} {
+      // Anyone can submit a result (even unauthenticated for this school app)
+      allow create: if isValidTestResult(request.resource.data);
+      
+      // Admins can see all results, users can see their own results
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid) || (isAuthenticated() && resource.data.studentName == request.auth.token.name);
+      
+      // Admins can delete results
+      allow delete: if isAdmin();
+      
+      // No one can update results
+      allow update: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAdmin();
+    }
+  }
+}
