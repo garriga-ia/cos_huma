@@ -7,8 +7,8 @@ import ReactMarkdown from 'react-markdown';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODELS = [
   'z-ai/glm-4.5-air:free',
-  'google/gemma-3-27b-it:free',
   'stepfun/step-3.5-flash:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
   'deepseek/deepseek-r1:free'
 ];
 
