@@ -5,7 +5,12 @@ import ReactMarkdown from 'react-markdown';
 
 // API configuration
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'z-ai/glm-4.5-air:free';
+const MODELS = [
+  'z-ai/glm-4.5-air:free',
+  'google/gemma-3-27b-it:free',
+  'stepfun/step-3.5-flash:free',
+  'deepseek/deepseek-r1:free'
+];
 
 interface Message {
   id: string;
@@ -28,7 +33,7 @@ export default function Chatbot({ language }: Props) {
       online: "Sempre en línia",
       thinking: "Pensant...",
       placeholder: "Escriu la teva pregunta...",
-      error: "Hi ha hagut un error de connexió.",
+      error: "Tots els models estan saturats. Torna-ho a provar d'aquí a un minut.",
       systemPrompt: `Ets un tutor virtual amigable i educatiu per a nens i estudiants, expert en el cos humà i anatomia.
 Respon sempre en l'idioma en què et parlin (principalment català).
 Fes respostes curtes, clares, didàctiques i utilitza emojis.
@@ -40,7 +45,7 @@ Si et pregunten coses que NO són sobre el cos humà, la salut, la biologia o l'
       online: "Siempre en línea",
       thinking: "Pensando...",
       placeholder: "Escribe tu pregunta...",
-      error: "Ha habido un error de conexión.",
+      error: "Todos los modelos están saturados. Inténtalo de nuevo en un minuto.",
       systemPrompt: `Eres un tutor virtual amigable y educativo para niños y estudiantes, experto en el cuerpo humano y anatomía.
 Responde siempre en el idioma en el que te hablen (principalmente español).
 Haz respuestas cortas, claras, didácticas y utiliza emojis.
@@ -52,7 +57,7 @@ Si te preguntan cosas que NO son sobre el cuerpo humano, la salud, la biología 
       online: "Always online",
       thinking: "Thinking...",
       placeholder: "Type your question...",
-      error: "There was a connection error.",
+      error: "All models are busy. Please try again in a minute.",
       systemPrompt: `You are a friendly and educational virtual tutor for kids and students, an expert in the human body and anatomy.
 Always respond in the language you are spoken to (mainly English).
 Keep your answers short, clear, educational, and use emojis.
@@ -98,50 +103,70 @@ If asked about things that are NOT about the human body, health, biology, or ana
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: userMsg }]);
     setIsLoading(true);
 
-    try {
-      if (!OPENROUTER_API_KEY) {
-        throw new Error("VITE_OPENROUTER_API_KEY no trobada.");
-      }
-
-      const response = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "model": MODEL,
-          "messages": [
-            { "role": "system", "content": t[language].systemPrompt },
-            ...messages.map(m => ({
-              role: m.role,
-              content: m.text
-            })),
-            { "role": "user", "content": userMsg }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('OpenRouter Error:', errorData);
-        throw new Error(`Status ${response.status}: ${JSON.stringify(errorData)}`);
-      }
-
-      const data = await response.json();
-      const replyText = data.choices?.[0]?.message?.content || 'Sense resposta del model.';
-      
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: replyText }]);
-    } catch (error: any) {
-      console.error('Error with OpenRouter API:', error);
+    if (!OPENROUTER_API_KEY) {
       setMessages(prev => [...prev, { 
         id: Date.now().toString(), 
         role: 'assistant', 
-        text: `${t[language].error} (${error.message})` 
+        text: "Error: VITE_OPENROUTER_API_KEY no trobada." 
       }]);
-    } finally {
       setIsLoading(false);
+      return;
     }
+
+    // Attempt with different models if one fails
+    for (const modelId of MODELS) {
+      try {
+        const response = await fetch(OPENROUTER_URL, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            "model": modelId,
+            "messages": [
+              { "role": "system", "content": t[language].systemPrompt },
+              ...messages.map(m => ({
+                role: m.role,
+                content: m.text
+              })),
+              { "role": "user", "content": userMsg }
+            ]
+          })
+        });
+
+        if (response.status === 429) {
+          console.warn(`Model ${modelId} saturated, trying next...`);
+          continue; // Try next model
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`Status ${response.status}: ${JSON.stringify(errorData)}`);
+        }
+
+        const data = await response.json();
+        const replyText = data.choices?.[0]?.message?.content;
+        
+        if (replyText) {
+          setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: replyText }]);
+          setIsLoading(false);
+          return; // Success!
+        }
+      } catch (error: any) {
+        console.error(`Error with model ${modelId}:`, error);
+        // If it's the last model and it failed, show error
+        if (modelId === MODELS[MODELS.length - 1]) {
+          setMessages(prev => [...prev, { 
+            id: Date.now().toString(), 
+            role: 'assistant', 
+            text: `${t[language].error} (${error.message})` 
+          }]);
+        }
+      }
+    }
+    
+    setIsLoading(false);
   };
 
   return (
