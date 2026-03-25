@@ -1,23 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Bot, User, Loader2 } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 
-// Initialize Gemini API safely
-let ai: GoogleGenAI | null = null;
-try {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined);
-  if (apiKey) {
-    ai = new GoogleGenAI({ apiKey });
-  }
-} catch (e) {
-  console.error("Failed to initialize Gemini API", e);
-}
+// API configuration
+const OPENROUTER_API_KEY = (import.meta as any).env?.VITE_OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_OPENROUTER_API_KEY : '');
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MODEL = 'z-ai/glm-4.5-air:free';
 
 interface Message {
   id: string;
-  role: 'user' | 'model';
+  role: 'user' | 'assistant';
   text: string;
 }
 
@@ -69,7 +62,7 @@ If asked about things that are NOT about the human body, health, biology, or ana
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
-      role: 'model',
+      role: 'assistant',
       text: t[language].welcome
     }
   ]);
@@ -104,34 +97,46 @@ If asked about things that are NOT about the human body, health, biology, or ana
     setIsLoading(true);
 
     try {
-      if (!ai) {
-        throw new Error("L'API key de Gemini no està configurada. Afegeix VITE_GEMINI_API_KEY a Vercel.");
+      if (!OPENROUTER_API_KEY) {
+        throw new Error("L'API key de OpenRouter no està configurada. Afegeix VITE_OPENROUTER_API_KEY a Vercel.");
       }
 
-      // Build conversation history for context
-      const history = messages.map(m => `${m.role === 'user' ? 'Alumne' : 'Tutor'}: ${m.text}`).join('\n');
-      const prompt = `
-${t[language].systemPrompt}
-
-Historial de la conversa:
-${history}
-
-Alumne: ${userMsg}
-Tutor:`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      const response = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Tutor d'Anatomia"
+        },
+        body: JSON.stringify({
+          "model": MODEL,
+          "messages": [
+            { "role": "system", "content": t[language].systemPrompt },
+            ...messages.map(m => ({
+              role: m.role,
+              content: m.text
+            })),
+            { "role": "user", "content": userMsg }
+          ]
+        })
       });
 
-      const replyText = response.text || 'Ho sento, no he pogut processar la resposta. Torna-ho a provar!';
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('OpenRouter Error:', errorData);
+        throw new Error(`Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const replyText = data.choices?.[0]?.message?.content || 'Ho sento, no he pogut processar la resposta. Torna-ho a provar!';
       
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: replyText }]);
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: replyText }]);
     } catch (error) {
-      console.error('Error with Gemini API:', error);
+      console.error('Error with OpenRouter API:', error);
       setMessages(prev => [...prev, { 
         id: Date.now().toString(), 
-        role: 'model', 
+        role: 'assistant', 
         text: t[language].error 
       }]);
     } finally {
