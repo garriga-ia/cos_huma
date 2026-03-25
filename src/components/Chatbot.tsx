@@ -4,7 +4,6 @@ import { MessageCircle, X, Send, Bot, User, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 // API configuration
-const OPENROUTER_API_KEY = (import.meta as any).env?.VITE_OPENROUTER_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_OPENROUTER_API_KEY : '');
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'z-ai/glm-4.5-air:free';
 
@@ -19,6 +18,9 @@ interface Props {
 }
 
 export default function Chatbot({ language }: Props) {
+  // Get API key from environment variables
+  const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+
   const t = {
     ca: {
       welcome: "Hola! Sóc el teu tutor virtual d'anatomia. Tens algun dubte sobre el cos humà?",
@@ -26,7 +28,7 @@ export default function Chatbot({ language }: Props) {
       online: "Sempre en línia",
       thinking: "Pensant...",
       placeholder: "Escriu la teva pregunta...",
-      error: "Hi ha hagut un error de connexió. Si us plau, torna-ho a provar més tard.",
+      error: "Hi ha hagut un error de connexió.",
       systemPrompt: `Ets un tutor virtual amigable i educatiu per a nens i estudiants, expert en el cos humà i anatomia.
 Respon sempre en l'idioma en què et parlin (principalment català).
 Fes respostes curtes, clares, didàctiques i utilitza emojis.
@@ -38,7 +40,7 @@ Si et pregunten coses que NO són sobre el cos humà, la salut, la biologia o l'
       online: "Siempre en línea",
       thinking: "Pensando...",
       placeholder: "Escribe tu pregunta...",
-      error: "Ha habido un error de conexión. Por favor, inténtalo de nuevo más tarde.",
+      error: "Ha habido un error de conexión.",
       systemPrompt: `Eres un tutor virtual amigable y educativo para niños y estudiantes, experto en el cuerpo humano y anatomía.
 Responde siempre en el idioma en el que te hablen (principalmente español).
 Haz respuestas cortas, claras, didácticas y utiliza emojis.
@@ -50,7 +52,7 @@ Si te preguntan cosas que NO son sobre el cuerpo humano, la salud, la biología 
       online: "Always online",
       thinking: "Thinking...",
       placeholder: "Type your question...",
-      error: "There was a connection error. Please try again later.",
+      error: "There was a connection error.",
       systemPrompt: `You are a friendly and educational virtual tutor for kids and students, an expert in the human body and anatomy.
 Always respond in the language you are spoken to (mainly English).
 Keep your answers short, clear, educational, and use emojis.
@@ -98,16 +100,14 @@ If asked about things that are NOT about the human body, health, biology, or ana
 
     try {
       if (!OPENROUTER_API_KEY) {
-        throw new Error("L'API key de OpenRouter no està configurada. Afegeix VITE_OPENROUTER_API_KEY a Vercel.");
+        throw new Error("VITE_OPENROUTER_API_KEY no trobada.");
       }
 
       const response = await fetch(OPENROUTER_URL, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Tutor d'Anatomia"
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           "model": MODEL,
@@ -125,19 +125,19 @@ If asked about things that are NOT about the human body, health, biology, or ana
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('OpenRouter Error:', errorData);
-        throw new Error(`Error: ${response.status} ${response.statusText}`);
+        throw new Error(`Status ${response.status}: ${JSON.stringify(errorData)}`);
       }
 
       const data = await response.json();
-      const replyText = data.choices?.[0]?.message?.content || 'Ho sento, no he pogut processar la resposta. Torna-ho a provar!';
+      const replyText = data.choices?.[0]?.message?.content || 'Sense resposta del model.';
       
       setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: replyText }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error with OpenRouter API:', error);
       setMessages(prev => [...prev, { 
         id: Date.now().toString(), 
         role: 'assistant', 
-        text: t[language].error 
+        text: `${t[language].error} (${error.message})` 
       }]);
     } finally {
       setIsLoading(false);
